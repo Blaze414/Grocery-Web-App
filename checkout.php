@@ -1,162 +1,216 @@
 <?php
 session_start();
-require 'db_config.php'; // Include the database configuration file with RDS connection
+require 'db_config.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_order'])) {
-    // Collect user information from the form
-    $name = $_POST['name'];
-    $email = $_POST['email'];
-    $cart = $_SESSION['cart'];
+  $name  = $_POST['name'];
+  $email = $_POST['email'];
+  $cart  = $_SESSION['cart'];
 
-    try {
-        // Start a transaction
-        $pdo->beginTransaction();
+  try {
+    $pdo->beginTransaction();
+    $totalAmount = 0;
+    foreach ($cart as $details) $totalAmount += $details['price'] * $details['quantity'];
 
-        // Calculate the total order amount
-        $totalAmount = 0;
-        foreach ($cart as $details) {
-            $totalAmount += $details['price'] * $details['quantity'];
-        }
+    $stmt = $pdo->prepare("INSERT INTO orders (user_name, user_email, total_amount, order_date) VALUES (?, ?, ?, NOW())");
+    $stmt->execute([$name, $email, $totalAmount]);
+    $orderId = $pdo->lastInsertId();
 
-        // Insert a new order record into the orders table
-        $stmt = $pdo->prepare("INSERT INTO orders (user_name, user_email, total_amount, order_date) VALUES (?, ?, ?, NOW())");
-        $stmt->execute([$name, $email, $totalAmount]);
-
-        // Retrieve the order ID
-        $orderId = $pdo->lastInsertId();
-
-        // Insert each cart item into the order_items table
-        foreach ($cart as $item => $details) {
-            $stmt = $pdo->prepare("INSERT INTO order_items (order_id, product_name, quantity, price) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$orderId, $item, $details['quantity'], $details['price']]);
-        }
-
-        // Commit the transaction
-        $pdo->commit();
-
-        // Clear the cart and set order confirmation message
-        $_SESSION['cart'] = [];
-        $orderConfirmed = true;
-
-    } catch (PDOException $e) {
-        // Roll back the transaction if something goes wrong
-        $pdo->rollBack();
-        echo "Error processing your order: " . $e->getMessage();
+    foreach ($cart as $item => $details) {
+      $stmt = $pdo->prepare("INSERT INTO order_items (order_id, product_name, quantity, price) VALUES (?, ?, ?, ?)");
+      $stmt->execute([$orderId, $item, $details['quantity'], $details['price']]);
     }
+
+    $pdo->commit();
+    $_SESSION['cart'] = [];
+    $orderConfirmed = true;
+
+  } catch (PDOException $e) {
+    $pdo->rollBack();
+    $orderError = "Error processing your order: " . $e->getMessage();
+  }
+}
+
+$totalQuantity = 0; $totalPrice = 0;
+if (isset($_SESSION['cart'])) {
+  foreach ($_SESSION['cart'] as $d) {
+    $totalQuantity += $d['quantity'];
+    $totalPrice    += $d['price'] * $d['quantity'];
+  }
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>Checkout - Grocery Store</title>
-	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" />
-	<link rel="stylesheet" href="styles.css" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Checkout — Grocery Store</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
 
-	<!-- Header Section -->
-	<header class="bg-light py-3">
-		<div class="container">
-			<nav class="navbar navbar-expand-lg navbar-light">
-				<a class="navbar-brand" href="#">Grocery Store</a>
-				<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-					<span class="navbar-toggler-icon"></span>
-				</button>
-				<div class="collapse navbar-collapse" id="navbarNav">
-					<ul class="navbar-nav ml-auto">
-						<li class="nav-item">
-							<a class="nav-link" href="index.php">Home</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link" href="shop.php">Shop</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link" href="#">Categories</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link" href="#">Contact</a>
-						</li>
-						<!-- Cart Button with Badge -->
-						<li class="nav-item position-relative">
-							<a class="nav-link btn btn-outline-primary text-primary" href="cart.php">
-								<i class="fas fa-shopping-cart"></i> Cart
-								<?php if (isset($_SESSION['cart']) && count($_SESSION['cart']) > 0):
-										  $totalQuantity = 0;
-										  $totalPrice = 0;
-										  foreach ($_SESSION['cart'] as $item => $details) {
-											  $totalQuantity += $details['quantity'];
-											  $totalPrice += $details['price'] * $details['quantity'];
-										  }
-                                ?>
-								<span class="badge badge-pill badge-danger cart-badge">
-									<?php echo $totalQuantity; ?> items | $<?php echo number_format($totalPrice, 2); ?>
-								</span>
-								<?php endif; ?>
-							</a>
-						</li>
-					</ul>
-					<form class="form-inline my-2 my-lg-0" method="get" action="shop.php">
-						<input class="form-control mr-sm-2" type="search" placeholder="Search products" aria-label="Search" name="search" value="<?php echo isset($_GET['search']) ? htmlspecialchars($_GET['search']) : ''; ?>" />
-						<button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
-					</form>
-				</div>
-			</nav>
-		</div>
-	</header>
+<!-- ── NAV ── -->
+<nav class="site-nav">
+  <div class="inner">
+    <a href="index.php" class="nav-brand">Grocery Store</a>
+    <ul class="nav-links">
+      <li><a href="index.php">Home</a></li>
+      <li><a href="shop.php">Shop</a></li>
+    </ul>
+    <div class="nav-spacer"></div>
+    <a href="cart.php" class="nav-cart">
+      <i class="fa fa-bag-shopping"></i> Cart
+      <?php if ($totalQuantity > 0): ?>
+        <span class="cart-count"><?= $totalQuantity ?></span>
+      <?php endif; ?>
+    </a>
+    <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
+</nav>
 
-	<!-- Checkout Section -->
-	<section class="checkout py-5">
-		<div class="container">
-			<h1 class="mt-4">Checkout</h1>
+<!-- ── PAGE HEADER ── -->
+<div class="page-header">
+  <div class="container">
+    <h1>Checkout</h1>
+    <div class="sub">Secure order</div>
+  </div>
+</div>
 
-			<?php if (isset($orderConfirmed) && $orderConfirmed): ?>
-			<div class="alert alert-success">
-				Thank you for your order! Your order has been confirmed.
-			</div>
-			<a href="index.php" class="btn btn-primary">Continue Shopping</a>
-			<?php elseif (isset($_SESSION['cart']) && count($_SESSION['cart']) > 0): ?>
-			<ul class="list-group mb-4">
-				<?php
-					  $total = 0;
-					  foreach ($_SESSION['cart'] as $item => $details):
-						  $itemTotal = $details['price'] * $details['quantity'];
-						  $total += $itemTotal;
-                ?>
-				<li class="list-group-item d-flex justify-content-between align-items-center">
-					<?php echo $details['quantity']; ?> x <?php echo htmlspecialchars($item); ?>
-					<span class="badge badge-primary badge-pill">
-						$<?php echo number_format($itemTotal, 2); ?>
-					</span>
-				</li>
-				<?php endforeach; ?>
-			</ul>
-			<h3>
-				Total: $<?php echo number_format($total, 2); ?>
-			</h3>
+<section class="section">
+  <div class="container">
 
-			<!-- User details form -->
-			<form method="post">
-				<div class="form-group">
-					<label for="name">Your Name:</label>
-					<input type="text" id="name" name="name" class="form-control" required />
-				</div>
-				<div class="form-group">
-					<label for="email">Your Email:</label>
-					<input type="email" id="email" name="email" class="form-control" required />
-				</div>
-				<button type="submit" name="confirm_order" class="btn btn-success">Confirm Order</button>
-			</form>
-			<?php else: ?>
-			<p class="alert alert-info">Your cart is empty.</p>
-			<a href="index.php" class="btn btn-primary">Start Shopping</a>
-			<?php endif; ?>
-		</div>
-	</section>
+    <?php if (isset($orderConfirmed) && $orderConfirmed): ?>
 
-	<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-	<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
-	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+      <!-- Success State -->
+      <div style="max-width:520px; margin:0 auto; text-align:center; padding:60px 0">
+        <div style="width:72px; height:72px; background:var(--success); border-radius:50%;
+                    display:flex; align-items:center; justify-content:center; margin:0 auto 24px;
+                    font-size:28px; color:white;">
+          <i class="fa fa-check"></i>
+        </div>
+        <h2 style="font-family:var(--font-display); font-weight:800; font-size:36px;
+                   text-transform:uppercase; letter-spacing:-.02em; margin-bottom:12px">
+          Order Confirmed!
+        </h2>
+        <p style="color:var(--text-2); margin-bottom:32px; font-size:15px">
+          Thank you for your order. You'll receive a confirmation email shortly.
+        </p>
+        <a href="index.php" class="btn btn-primary">
+          <i class="fa fa-arrow-left" style="font-size:10px"></i>&nbsp; Continue Shopping
+        </a>
+      </div>
+
+    <?php elseif (isset($_SESSION['cart']) && count($_SESSION['cart']) > 0): ?>
+
+      <?php if (isset($orderError)): ?>
+        <div class="alert alert-warning" style="margin-bottom:24px">
+          <i class="fa fa-triangle-exclamation"></i> <?= htmlspecialchars($orderError) ?>
+        </div>
+      <?php endif; ?>
+
+      <div class="checkout-layout">
+
+        <!-- Form -->
+        <div>
+          <div class="checkout-box">
+            <div class="checkout-box-title">
+              <i class="fa fa-user" style="font-size:14px; margin-right:8px"></i> Contact Details
+            </div>
+            <form method="post" id="checkoutForm">
+              <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" name="name" class="form-control"
+                       placeholder="Your full name" required/>
+              </div>
+              <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" class="form-control"
+                       placeholder="you@example.com" required/>
+              </div>
+              <button type="submit" name="confirm_order" class="btn btn-primary btn-block"
+                      style="margin-top:8px">
+                <i class="fa fa-lock" style="font-size:11px"></i>&nbsp; Confirm Order &nbsp;·&nbsp;
+                $<?= number_format($totalPrice + ($totalPrice >= 30 ? 0 : 4.99), 2) ?>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Order summary -->
+        <div>
+          <div class="checkout-box">
+            <div class="checkout-box-title">
+              <i class="fa fa-bag-shopping" style="font-size:13px; margin-right:8px"></i> Order Summary
+            </div>
+            <?php
+              $subtotal = $totalPrice;
+              $delivery = $subtotal >= 30 ? 0 : 4.99;
+              $grand    = $subtotal + $delivery;
+            ?>
+            <?php foreach ($_SESSION['cart'] as $item => $d):
+              $itemTotal = $d['price'] * $d['quantity'];
+            ?>
+              <div class="order-line">
+                <div>
+                  <div class="order-line-name"><?= htmlspecialchars($item) ?></div>
+                  <div class="order-line-qty">× <?= $d['quantity'] ?> &nbsp;·&nbsp; $<?= number_format($d['price'],2) ?> each</div>
+                </div>
+                <div class="order-line-price">$<?= number_format($itemTotal, 2) ?></div>
+              </div>
+            <?php endforeach; ?>
+
+            <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border)">
+              <div style="display:flex; justify-content:space-between; margin-bottom:8px;
+                          font-size:13px; color:var(--text-2)">
+                <span>Subtotal</span><span>$<?= number_format($subtotal,2) ?></span>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:16px;
+                          font-size:13px; color:var(--text-2)">
+                <span>Delivery</span>
+                <span><?= $delivery == 0
+                  ? '<span style="color:var(--success);font-weight:600">Free</span>'
+                  : '$'.number_format($delivery,2) ?></span>
+              </div>
+              <div style="display:flex; justify-content:space-between;
+                          border-top:2px solid var(--black); padding-top:16px">
+                <span style="font-family:var(--font-display); font-weight:700; font-size:13px;
+                             letter-spacing:.08em; text-transform:uppercase">Total</span>
+                <span style="font-family:var(--font-display); font-weight:800; font-size:24px;
+                             letter-spacing:-.02em">$<?= number_format($grand,2) ?></span>
+              </div>
+            </div>
+          </div>
+
+          <a href="cart.php" style="display:block; margin-top:12px; text-align:center;
+             font-family:var(--font-display); font-size:12px; letter-spacing:.08em;
+             text-transform:uppercase; color:var(--text-3)">
+            <i class="fa fa-arrow-left" style="font-size:9px"></i>&nbsp; Edit Cart
+          </a>
+        </div>
+
+      </div>
+
+    <?php else: ?>
+
+      <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa fa-bag-shopping"></i></div>
+        <h2>Nothing to checkout</h2>
+        <p>Your cart is empty. Add some products first.</p>
+        <a href="shop.php" class="btn btn-primary">Start Shopping</a>
+      </div>
+
+    <?php endif; ?>
+
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer class="site-footer">
+  <div class="inner">
+    <span class="footer-brand">Grocery Store</span>
+    <span class="footer-copy">&copy; 2024 Al Zadid Yusuf. All rights reserved.</span>
+  </div>
+</footer>
 </body>
 </html>

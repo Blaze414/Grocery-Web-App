@@ -2,127 +2,166 @@
 session_start();
 
 $products = [
-    "Apple" => ["price" => 1.00, "image" => "Images/apple.jpg", "category" => "fruits"],
-    "Banana" => ["price" => 0.50, "image" => "Images/banana.jpg", "category" => "fruits"],
-    "Orange" => ["price" => 0.75, "image" => "Images/orange.jpg", "category" => "fruits"],
-    "Carrot" => ["price" => 1.20, "image" => "Images/carrot.jpg", "category" => "vegetables"],
-    "Broccoli" => ["price" => 1.80, "image" => "Images/broccoli.jpg", "category" => "vegetables"],
-    "Milk" => ["price" => 1.50, "image" => "Images/milk.jpg", "category" => "dairy"],
-    "Cheese" => ["price" => 2.50, "image" => "Images/cheese.jpg", "category" => "dairy"],
-    "Chips" => ["price" => 2.00, "image" => "Images/chips.jpg", "category" => "snacks"],
-    "Cookies" => ["price" => 2.50, "image" => "Images/cookies.jpg", "category" => "snacks"],
-    // Add more products as needed
+  "Apple"    => ["price" => 1.00, "image" => "Images/apple.jpg",    "category" => "fruits"],
+  "Banana"   => ["price" => 0.50, "image" => "Images/banana.jpg",   "category" => "fruits"],
+  "Orange"   => ["price" => 0.75, "image" => "Images/orange.jpg",   "category" => "fruits"],
+  "Carrot"   => ["price" => 1.20, "image" => "Images/carrot.jpg",   "category" => "vegetables"],
+  "Broccoli" => ["price" => 1.80, "image" => "Images/broccoli.jpg", "category" => "vegetables"],
+  "Milk"     => ["price" => 1.50, "image" => "Images/milk.jpg",     "category" => "dairy"],
+  "Cheese"   => ["price" => 2.50, "image" => "Images/cheese.jpg",   "category" => "dairy"],
+  "Chips"    => ["price" => 2.00, "image" => "Images/chips.jpg",    "category" => "snacks"],
+  "Cookies"  => ["price" => 2.50, "image" => "Images/cookies.jpg",  "category" => "snacks"],
 ];
 
-$searchQuery = isset($_GET['search']) ? strtolower(trim($_GET['search'])) : '';
+$searchQuery     = isset($_GET['search']) ? strtolower(trim($_GET['search'])) : '';
+$categoryFilter  = isset($_GET['cat'])    ? $_GET['cat'] : '';
 
 $filteredProducts = [];
-
-if ($searchQuery) {
-    foreach ($products as $productName => $details) {
-        if (strpos(strtolower($productName), $searchQuery) !== false) {
-            $filteredProducts[$productName] = $details;
-        }
-    }
-} else {
-    $filteredProducts = $products;
+foreach ($products as $name => $d) {
+  $matchSearch = !$searchQuery || strpos(strtolower($name), $searchQuery) !== false;
+  $matchCat    = !$categoryFilter || $d['category'] === $categoryFilter;
+  if ($matchSearch && $matchCat) $filteredProducts[$name] = $d;
 }
+
+$totalQuantity = 0; $totalPrice = 0;
+if (isset($_SESSION['cart'])) {
+  foreach ($_SESSION['cart'] as $d) {
+    $totalQuantity += $d['quantity'];
+    $totalPrice    += $d['price'] * $d['quantity'];
+  }
+}
+
+$categories = ['fruits','vegetables','dairy','snacks'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>Shop - Grocery Store</title>
-	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" />
-	<link rel="stylesheet" href="styles.css" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Shop — Grocery Store</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <style>
+    .filter-bar {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 32px;
+    }
+    .filter-pill {
+      font-family: var(--font-display);
+      font-weight: 600; font-size: 12px; letter-spacing: .1em;
+      text-transform: uppercase; padding: 8px 18px;
+      border: 1.5px solid var(--border); border-radius: 100px;
+      background: transparent; color: var(--text-2);
+      cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+      text-decoration: none;
+    }
+    .filter-pill:hover,
+    .filter-pill.active {
+      background: var(--black); color: var(--white);
+      border-color: var(--black);
+    }
+    .results-meta {
+      font-family: var(--font-display);
+      font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+      color: var(--text-3); margin-bottom: 16px;
+    }
+  </style>
 </head>
 <body>
 
-	<!-- Header Section -->
-	<header class="bg-light py-3">
-		<div class="container">
-			<nav class="navbar navbar-expand-lg navbar-light">
-				<a class="navbar-brand" href="#">Grocery Store</a>
-				<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-					<span class="navbar-toggler-icon"></span>
-				</button>
-				<div class="collapse navbar-collapse" id="navbarNav">
-					<ul class="navbar-nav ml-auto">
-						<li class="nav-item">
-							<a class="nav-link" href="index.php">Home</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link" href="shop.php">Shop</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link" href="#">Categories</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link" href="#">Contact</a>
-						</li>
-						<!-- Cart Button with Badge -->
-						<li class="nav-item position-relative">
-							<a class="nav-link btn btn-outline-primary text-primary" href="cart.php">
-								<i class="fas fa-shopping-cart"></i> Cart
-								<?php if (isset($_SESSION['cart']) && count($_SESSION['cart']) > 0):
-										  $totalQuantity = 0;
-										  $totalPrice = 0;
-										  foreach ($_SESSION['cart'] as $item => $details) {
-											  $totalQuantity += $details['quantity'];
-											  $totalPrice += $details['price'] * $details['quantity'];
-										  }
-                                ?>
-								<span class="badge badge-pill badge-danger cart-badge">
-									<?php echo $totalQuantity; ?> items | $<?php echo number_format($totalPrice, 2); ?>
-								</span>
-								<?php endif; ?>
-							</a>
-						</li>
-					</ul>
-					<form class="form-inline my-2 my-lg-0" method="get" action="shop.php">
-						<input class="form-control mr-sm-2" type="search" placeholder="Search products" aria-label="Search" name="search" value="<?php echo isset($_GET['search']) ? htmlspecialchars($_GET['search']) : ''; ?>" />
-						<button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
-					</form>
-				</div>
-			</nav>
-		</div>
-	</header>
+<!-- ── NAV ── -->
+<nav class="site-nav">
+  <div class="inner">
+    <a href="index.php" class="nav-brand">Grocery Store</a>
+    <ul class="nav-links">
+      <li><a href="index.php">Home</a></li>
+      <li><a href="shop.php" class="active">Shop</a></li>
+      <li><a href="category.php?category=vegetables">Categories</a></li>
+    </ul>
+    <div class="nav-spacer"></div>
+    <form class="nav-search" method="get" action="shop.php">
+      <input type="search" name="search" placeholder="Search products…"
+             value="<?= htmlspecialchars($searchQuery) ?>"/>
+      <?php if ($categoryFilter): ?>
+        <input type="hidden" name="cat" value="<?= htmlspecialchars($categoryFilter) ?>"/>
+      <?php endif; ?>
+      <button type="submit"><i class="fa fa-search"></i></button>
+    </form>
+    <a href="cart.php" class="nav-cart" style="margin-left:16px">
+      <i class="fa fa-bag-shopping"></i> Cart
+      <?php if ($totalQuantity > 0): ?>
+        <span class="cart-count"><?= $totalQuantity ?></span>
+      <?php endif; ?>
+    </a>
+    <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
+</nav>
 
-	<!-- Shop Section -->
-	<section class="shop py-5">
-		<div class="container">
-			<h1 class="mb-4">Shop All Products</h1>
-			<div class="row">
-				<?php if (empty($filteredProducts)): ?>
-				<div class="col-12">
-					<p class="alert alert-warning">No products found.</p>
-				</div>
-				<?php else: ?>
-				<?php foreach ($filteredProducts as $productName => $details): ?>
-				<div class="col-md-4">
-					<div class="card mb-4 shadow-sm">
-						<img src="<?php echo $details['image']; ?>" class="card-img-top" alt="<?php echo $productName; ?>" />
-						<div class="card-body">
-							<h5 class="card-title">
-								<?php echo $productName; ?>
-							</h5>
-							<p class="card-text">
-								$<?php echo number_format($details['price'], 2); ?>
-							</p>
-							<a href="product.php?name=<?php echo $productName; ?>" class="btn btn-primary">View Product</a>
-						</div>
-					</div>
-				</div>
-				<?php endforeach; ?>
-				<?php endif; ?>
-			</div>
-		</div>
-	</section>
+<!-- ── PAGE HEADER ── -->
+<div class="page-header">
+  <div class="container">
+    <h1>All Products</h1>
+    <div class="sub"><?= count($filteredProducts) ?> items available</div>
+  </div>
+</div>
 
-	<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-	<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
-	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<!-- ── SHOP ── -->
+<section class="section">
+  <div class="container">
+
+    <!-- Filters -->
+    <div class="filter-bar">
+      <a href="shop.php<?= $searchQuery ? '?search='.urlencode($searchQuery) : '' ?>"
+         class="filter-pill <?= !$categoryFilter ? 'active' : '' ?>">All</a>
+      <?php foreach ($categories as $cat): ?>
+        <a href="shop.php?<?= $searchQuery ? 'search='.urlencode($searchQuery).'&' : '' ?>cat=<?= $cat ?>"
+           class="filter-pill <?= $categoryFilter === $cat ? 'active' : '' ?>">
+          <?= ucfirst($cat) ?>
+        </a>
+      <?php endforeach; ?>
+    </div>
+
+    <?php if ($searchQuery): ?>
+      <div class="results-meta">Results for "<?= htmlspecialchars($searchQuery) ?>"</div>
+    <?php endif; ?>
+
+    <?php if (empty($filteredProducts)): ?>
+      <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa fa-magnifying-glass"></i></div>
+        <h2>No products found</h2>
+        <p>Try a different search or browse all categories.</p>
+        <a href="shop.php" class="btn btn-primary">Clear Filters</a>
+      </div>
+    <?php else: ?>
+      <div class="products-grid">
+        <?php foreach ($filteredProducts as $name => $d): ?>
+          <div class="product-card">
+            <div class="product-card-img">
+              <img src="<?= $d['image'] ?>" alt="<?= htmlspecialchars($name) ?>"/>
+            </div>
+            <div class="product-card-body">
+              <div class="product-card-cat"><?= ucfirst($d['category']) ?></div>
+              <div class="product-card-name"><?= htmlspecialchars($name) ?></div>
+              <div class="product-card-footer">
+                <span class="product-card-price">$<?= number_format($d['price'], 2) ?></span>
+                <a href="product.php?name=<?= urlencode($name) ?>" class="btn btn-primary btn-sm">
+                  Add <i class="fa fa-plus" style="font-size:10px"></i>
+                </a>
+              </div>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer class="site-footer">
+  <div class="inner">
+    <span class="footer-brand">Grocery Store</span>
+    <span class="footer-copy">&copy; 2024 Al Zadid Yusuf. All rights reserved.</span>
+  </div>
+</footer>
 </body>
 </html>
-

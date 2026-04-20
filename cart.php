@@ -1,135 +1,187 @@
 <?php
 session_start();
 
-// Handle item removal
 if (isset($_POST['remove_item'])) {
-    $itemToRemove = $_POST['remove_item'];
-    unset($_SESSION['cart'][$itemToRemove]);
-    header("Location: cart.php");
-    exit();
+  unset($_SESSION['cart'][$_POST['remove_item']]);
+  header("Location: cart.php"); exit();
+}
+if (isset($_POST['update_quantity'])) {
+  $item = $_POST['item_name'];
+  $qty  = intval($_POST['quantity']);
+  if ($qty > 0) $_SESSION['cart'][$item]['quantity'] = $qty;
+  else          unset($_SESSION['cart'][$item]);
+  header("Location: cart.php"); exit();
 }
 
-// Handle quantity update
-if (isset($_POST['update_quantity'])) {
-    $itemToUpdate = $_POST['item_name'];
-    $newQuantity = intval($_POST['quantity']);
-    if ($newQuantity > 0) {
-        $_SESSION['cart'][$itemToUpdate]['quantity'] = $newQuantity;
-    } else {
-        unset($_SESSION['cart'][$itemToUpdate]); // Remove item if quantity is set to 0
-    }
-    header("Location: cart.php");
-    exit();
+$totalQuantity = 0; $totalPrice = 0;
+if (isset($_SESSION['cart'])) {
+  foreach ($_SESSION['cart'] as $d) {
+    $totalQuantity += $d['quantity'];
+    $totalPrice    += $d['price'] * $d['quantity'];
+  }
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8" />
-	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title>Shopping Cart - Grocery Store</title>
-	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" />
-	<link rel="stylesheet" href="styles.css" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Cart — Grocery Store</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
 
-	<!-- Header Section -->
-	<header class="bg-light py-3">
-		<div class="container">
-			<nav class="navbar navbar-expand-lg navbar-light">
-				<a class="navbar-brand" href="#">Grocery Store</a>
-				<button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-					<span class="navbar-toggler-icon"></span>
-				</button>
-				<div class="collapse navbar-collapse" id="navbarNav">
-					<ul class="navbar-nav ml-auto">
-						<li class="nav-item">
-							<a class="nav-link" href="index.php">Home</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link" href="shop.php">Shop</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link" href="#">Categories</a>
-						</li>
-						<li class="nav-item">
-							<a class="nav-link" href="#">Contact</a>
-						</li>
-						<!-- Cart Button with Badge -->
-						<li class="nav-item position-relative">
-							<a class="nav-link btn btn-outline-primary text-primary" href="cart.php">
-								<i class="fas fa-shopping-cart"></i> Cart
-								<?php if (isset($_SESSION['cart']) && count($_SESSION['cart']) > 0):
-										  $totalQuantity = 0;
-										  $totalPrice = 0;
-										  foreach ($_SESSION['cart'] as $item => $details) {
-											  $totalQuantity += $details['quantity'];
-											  $totalPrice += $details['price'] * $details['quantity'];
-										  }
-                                ?>
-								<span class="badge badge-pill badge-danger cart-badge">
-									<?php echo $totalQuantity; ?> items | $<?php echo number_format($totalPrice, 2); ?>
-								</span>
-								<?php endif; ?>
-							</a>
-						</li>
-					</ul>
-					<form class="form-inline my-2 my-lg-0" method="get" action="shop.php">
-						<input class="form-control mr-sm-2" type="search" placeholder="Search products" aria-label="Search" name="search" value="<?php echo isset($_GET['search']) ? htmlspecialchars($_GET['search']) : ''; ?>" />
-						<button class="btn btn-outline-success my-2 my-sm-0" type="submit">Search</button>
-					</form>
-				</div>
-			</nav>
-		</div>
-	</header>
+<!-- ── NAV ── -->
+<nav class="site-nav">
+  <div class="inner">
+    <a href="index.php" class="nav-brand">Grocery Store</a>
+    <ul class="nav-links">
+      <li><a href="index.php">Home</a></li>
+      <li><a href="shop.php">Shop</a></li>
+      <li><a href="category.php?category=vegetables">Categories</a></li>
+    </ul>
+    <div class="nav-spacer"></div>
+    <form class="nav-search" method="get" action="shop.php">
+      <input type="search" name="search" placeholder="Search products…"/>
+      <button type="submit"><i class="fa fa-search"></i></button>
+    </form>
+    <a href="cart.php" class="nav-cart" style="margin-left:16px">
+      <i class="fa fa-bag-shopping"></i> Cart
+      <?php if ($totalQuantity > 0): ?>
+        <span class="cart-count"><?= $totalQuantity ?></span>
+      <?php endif; ?>
+    </a>
+    <button class="nav-toggle" aria-label="Menu"><span></span><span></span><span></span></button>
+  </div>
+</nav>
 
-	<!-- Shopping Cart Section -->
-	<section class="shopping-cart py-5">
-		<div class="container">
-			<h1 class="mt-4">Your Shopping Cart</h1>
-			<?php if (isset($_SESSION['cart']) && count($_SESSION['cart']) > 0): ?>
-			<ul class="list-group mb-4">
-				<?php
-					  $total = 0;
-					  foreach ($_SESSION['cart'] as $item => $details):
-						  $itemTotal = $details['price'] * $details['quantity'];
-						  $total += $itemTotal;
-				?>
-				<li class="list-group-item d-flex justify-content-between align-items-center">
-					<div>
-						<form method="post" class="d-inline-block mr-3">
-							<input type="hidden" name="item_name" value="<?php echo $item; ?>" />
-							<input type="number" name="quantity" value="<?php echo $details['quantity']; ?>" min="1" class="form-control d-inline-block" style="width: 80px;" />
-							<button type="submit" name="update_quantity" class="btn btn-secondary btn-sm ml-2">Update</button>
-						</form>
-						<?php echo htmlspecialchars($item); ?>
-					</div>
-					<div>
-						<span class="badge badge-primary badge-pill">
-							$<?php echo number_format($itemTotal, 2); ?>
-						</span>
-						<form method="post" class="d-inline-block ml-3">
-							<input type="hidden" name="remove_item" value="<?php echo $item; ?>" />
-							<button type="submit" class="btn btn-danger btn-sm">Remove</button>
-						</form>
-					</div>
-				</li>
-				<?php endforeach; ?>
-			</ul>
-			<h3>
-				Total: $<?php echo number_format($total, 2); ?>
-			</h3>
-			<a href="index.php" class="btn btn-primary">Continue Shopping</a>
-			<a href="checkout.php" class="btn btn-success">Proceed to Checkout</a>
-			<?php else: ?>
-			<p class="alert alert-info">Your cart is empty.</p>
-			<a href="index.php" class="btn btn-primary">Start Shopping</a>
-			<?php endif; ?>
-		</div>
-	</section>
+<!-- ── PAGE HEADER ── -->
+<div class="page-header">
+  <div class="container">
+    <h1>Your Cart</h1>
+    <?php if ($totalQuantity > 0): ?>
+      <div class="sub"><?= $totalQuantity ?> item<?= $totalQuantity != 1 ? 's' : '' ?></div>
+    <?php endif; ?>
+  </div>
+</div>
 
-	<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-	<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
-	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<!-- ── CART BODY ── -->
+<section class="section">
+  <div class="container">
+
+    <?php if (isset($_SESSION['cart']) && count($_SESSION['cart']) > 0): ?>
+
+      <div class="cart-layout">
+
+        <!-- Items -->
+        <div>
+          <table class="cart-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th style="text-align:center">Quantity</th>
+                <th>Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($_SESSION['cart'] as $item => $details):
+                $itemTotal = $details['price'] * $details['quantity'];
+              ?>
+              <tr>
+                <td>
+                  <div class="cart-item-name"><?= htmlspecialchars($item) ?></div>
+                  <div style="font-size:13px; color:var(--text-3); margin-top:3px">
+                    $<?= number_format($details['price'], 2) ?> each
+                  </div>
+                </td>
+                <td style="text-align:center">
+                  <form method="post" class="cart-qty-wrap" style="justify-content:center">
+                    <input type="hidden" name="item_name" value="<?= htmlspecialchars($item) ?>"/>
+                    <input type="number" name="quantity" value="<?= $details['quantity'] ?>" min="0"/>
+                    <button type="submit" name="update_quantity" class="btn btn-secondary btn-sm">Update</button>
+                  </form>
+                </td>
+                <td>
+                  <span class="t-price" style="font-size:18px">$<?= number_format($itemTotal, 2) ?></span>
+                </td>
+                <td>
+                  <form method="post">
+                    <input type="hidden" name="remove_item" value="<?= htmlspecialchars($item) ?>"/>
+                    <button type="submit" class="btn btn-danger">
+                      <i class="fa fa-trash" style="font-size:10px"></i> Remove
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+
+          <div style="margin-top:24px">
+            <a href="shop.php" class="btn btn-secondary">
+              <i class="fa fa-arrow-left" style="font-size:10px"></i>&nbsp; Continue Shopping
+            </a>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="cart-summary">
+          <div class="cart-summary-title">Order Summary</div>
+
+          <?php
+            $subtotal = $totalPrice;
+            $delivery = $subtotal >= 30 ? 0 : 4.99;
+            $grandTotal = $subtotal + $delivery;
+          ?>
+
+          <div class="summary-row">
+            <span>Subtotal</span>
+            <span>$<?= number_format($subtotal, 2) ?></span>
+          </div>
+          <div class="summary-row">
+            <span>Delivery</span>
+            <span><?= $delivery == 0 ? '<span style="color:var(--success);font-weight:600">Free</span>' : '$'.number_format($delivery,2) ?></span>
+          </div>
+          <?php if ($delivery > 0): ?>
+          <div class="summary-row" style="font-size:12px; color:var(--text-3)">
+            <span>Add $<?= number_format(30 - $subtotal, 2) ?> for free delivery</span>
+          </div>
+          <?php endif; ?>
+
+          <div class="summary-total">
+            <span class="summary-total-label">Total</span>
+            <span class="summary-total-price">$<?= number_format($grandTotal, 2) ?></span>
+          </div>
+
+          <a href="checkout.php" class="btn btn-primary btn-block">
+            Proceed to Checkout &nbsp;<i class="fa fa-arrow-right" style="font-size:11px"></i>
+          </a>
+        </div>
+
+      </div>
+
+    <?php else: ?>
+
+      <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa fa-bag-shopping"></i></div>
+        <h2>Your cart is empty</h2>
+        <p>Looks like you haven't added anything yet.</p>
+        <a href="shop.php" class="btn btn-primary">Start Shopping</a>
+      </div>
+
+    <?php endif; ?>
+
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer class="site-footer">
+  <div class="inner">
+    <span class="footer-brand">Grocery Store</span>
+    <span class="footer-copy">&copy; 2024 Al Zadid Yusuf. All rights reserved.</span>
+  </div>
+</footer>
 </body>
 </html>
