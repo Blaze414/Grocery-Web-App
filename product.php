@@ -127,5 +127,6 @@ function adjustQty(delta) {
   el.value = Math.max(1, v);
 }
 </script>
+<script src="transitions.js"></script>
 </body>
 </html>

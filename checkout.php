@@ -212,5 +212,6 @@ if (isset($_SESSION['cart'])) {
     <span class="footer-copy">&copy; 2024 Al Zadid Yusuf. All rights reserved.</span>
   </div>
 </footer>
+<script src="transitions.js"></script>
 </body>
 </html>

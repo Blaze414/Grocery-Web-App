@@ -133,5 +133,6 @@ if (isset($_SESSION['cart'])) {
   </div>
 </footer>
 
+<script src="transitions.js"></script>
 </body>
 </html>
